@@ -4,6 +4,9 @@
   "description": "Automatically groups tabs based on their domain names.",
   "version": "0.1",
   "author": "Jean Carlos Niehues",
+  "icons": {
+    "128": "images/icon128.png"
+  },
   "permissions": ["tabs", "tabGroups"],
   "background": {
     "service_worker": "background.js",
