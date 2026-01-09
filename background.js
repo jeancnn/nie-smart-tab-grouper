@@ -12,14 +12,24 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-// Helper to extract the registered domain (e.g., "example.com" from "mail.example.com")
-// function getRegisteredDomain(hostname) {
-//   const parts = hostname.split(".").filter(Boolean);
-//   if (parts.length >= 2) {
-//     return parts.slice(-2).join(".");
-//   }
-//   return hostname;
-// }
+async function retryTabOperation(operation, maxRetries = 3, delayMs = 100) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (
+        error.message.includes("Tabs cannot be edited right now") &&
+        i < maxRetries - 1
+      ) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, delayMs * Math.pow(2, i))
+        );
+      } else {
+        throw error;
+      }
+    }
+  }
+}
 
 async function organizeTabs() {
   const tabs = await chrome.tabs.query({ currentWindow: true });
@@ -61,17 +71,27 @@ async function organizeTabs() {
     const domainTabs = urlMap[domain];
 
     if (domainTabs.length > 1) {
-      const tabIds = domainTabs.map((t) => t.id);
-
       const existingGroupTab = domainTabs.find((t) => t.groupId !== -1);
       const existingGroupId = existingGroupTab
         ? existingGroupTab.groupId
         : null;
 
       if (existingGroupId !== null) {
-        await chrome.tabs.group({ tabIds, groupId: existingGroupId });
+        // Only move tabs that aren't already in a group
+        const tabsToMove = domainTabs
+          .filter((t) => t.groupId === -1)
+          .map((t) => t.id);
+
+        if (tabsToMove.length > 0) {
+          await retryTabOperation(() =>
+            chrome.tabs.group({ tabIds: tabsToMove, groupId: existingGroupId })
+          );
+        }
       } else {
-        const groupId = await chrome.tabs.group({ tabIds });
+        const tabIds = domainTabs.map((t) => t.id);
+        const groupId = await retryTabOperation(() =>
+          chrome.tabs.group({ tabIds })
+        );
 
         const namePart = domain.split(".")[0];
         const formattedTitle =

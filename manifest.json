@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Nie Smart TAB Grouper",
   "description": "Automatically groups tabs based on their domain names.",
-  "version": "0.1",
+  "version": "0.3",
   "author": "Jean Carlos Niehues",
   "icons": {
     "128": "images/icon128.png"
