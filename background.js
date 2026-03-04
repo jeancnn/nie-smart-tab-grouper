@@ -22,7 +22,7 @@ async function retryTabOperation(operation, maxRetries = 3, delayMs = 100) {
         i < maxRetries - 1
       ) {
         await new Promise((resolve) =>
-          setTimeout(resolve, delayMs * Math.pow(2, i))
+          setTimeout(resolve, delayMs * Math.pow(2, i)),
         );
       } else {
         throw error;
@@ -84,13 +84,20 @@ async function organizeTabs() {
 
         if (tabsToMove.length > 0) {
           await retryTabOperation(() =>
-            chrome.tabs.group({ tabIds: tabsToMove, groupId: existingGroupId })
+            chrome.tabs.group({ tabIds: tabsToMove, groupId: existingGroupId }),
           );
+
+          // Reapply the title to force a UI refresh; Chrome sometimes hides
+          // the name of the group until the user interacts with it.
+          const namePart = domain.split(".")[0];
+          const formattedTitle =
+            namePart.charAt(0).toUpperCase() + namePart.slice(1);
+          chrome.tabGroups.update(existingGroupId, { title: formattedTitle });
         }
       } else {
         const tabIds = domainTabs.map((t) => t.id);
         const groupId = await retryTabOperation(() =>
-          chrome.tabs.group({ tabIds })
+          chrome.tabs.group({ tabIds }),
         );
 
         const namePart = domain.split(".")[0];
@@ -102,10 +109,17 @@ async function organizeTabs() {
             Math.floor(Math.random() * CONFIG.groupColors.length)
           ];
 
+        // set properties on the new group
         await chrome.tabGroups.update(groupId, {
           title: formattedTitle,
           color: randomColor,
         });
+
+        // Sometimes Chrome doesn't render the label until after an
+        // interaction; schedule a second update to force the refresh.
+        setTimeout(() => {
+          chrome.tabGroups.update(groupId, { title: formattedTitle });
+        }, 150);
       }
     }
   }
